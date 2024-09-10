@@ -1,0 +1,182 @@
+
+import numpy as np
+import cv2
+import pywt
+from sklearn.decomposition import PCA
+from collections import Counter
+import heapq
+import os
+import time
+import sys
+
+# Function to perform Huffman coding
+class Node:
+    def __init__(self, value, freq):
+        self.value = value
+        self.freq = freq
+        self.left = None
+        self.right = None
+
+    def __lt__(self, other):
+        return self.freq < other.freq
+
+def huffman_coding(data):
+    frequency = Counter(data)
+    heap = [Node(value, freq) for value, freq in frequency.items()]
+    heapq.heapify(heap)
+
+    while len(heap) > 1:
+        left = heapq.heappop(heap)
+        right = heapq.heappop(heap)
+        merged = Node(None, left.freq + right.freq)
+        merged.left = left
+        merged.right = right
+        heapq.heappush(heap, merged)
+
+    root = heap[0]
+    huffman_code = {}
+
+    def generate_code(node, current_code):
+        if node is not None:
+            if node.value is not None:
+                huffman_code[node.value] = current_code
+            generate_code(node.left, current_code + "0")
+            generate_code(node.right, current_code + "1")
+
+    generate_code(root, "")
+    return huffman_code
+
+# Start measuring time and memory usage
+start_time = time.time()
+total_memory_usage = 0
+
+# Load image
+image_load_start_time = time.time()
+im = cv2.imread(r"D:\ENAM\PAPERS\AR VR Paper\imageARVR\circuit_boards4.png", cv2.IMREAD_GRAYSCALE)
+if im is None:
+    print("Image not found. Please check the path and try again.")
+    exit()
+image_load_end_time = time.time()
+image_memory_usage = sys.getsizeof(im)
+total_memory_usage += image_memory_usage
+print(f"Image Loading Time: {image_load_end_time - image_load_start_time:.4f} seconds")
+print(f"Memory Usage of Loaded Image: {image_memory_usage} bytes")
+
+# Flatten the image
+flatten_start_time = time.time()
+image_flattened = image.flatten().reshape(-1, 1)
+flatten_end_time = time.time()
+flattened_image_memory_usage = sys.getsizeof(image_flattened)
+total_memory_usage += flattened_image_memory_usage
+print(f"Flattening Time: {flatten_end_time - flatten_start_time:.4f} seconds")
+print(f"Memory Usage of Flattened Image: {flattened_image_memory_usage} bytes")
+
+# Apply PCA
+pca_start_time = time.time()
+pca = PCA(n_components=0.95)  # Retain 95% of variance
+image_pca = pca.fit_transform(image_flattened)
+pca_end_time = time.time()
+pca_memory_usage = sys.getsizeof(image_pca)
+total_memory_usage += pca_memory_usage
+print(f"PCA Time: {pca_end_time - pca_start_time:.4f} seconds")
+print(f"Memory Usage after PCA: {pca_memory_usage} bytes")
+
+# Apply DWT
+dwt_start_time = time.time()
+coeffs = pywt.dwt2(im, 'haar')
+cA, (cH, cV, cD) = coeffs
+dwt_end_time = time.time()
+dwt_memory_usage = sys.getsizeof(coeffs)
+total_memory_usage += dwt_memory_usage
+print(f"DWT Time: {dwt_end_time - dwt_start_time:.4f} seconds")
+print(f"Memory Usage of DWT Coefficients: {dwt_memory_usage} bytes")
+
+# Combine PCA and DWT coefficients
+combine_start_time = time.time()
+combined_coeffs = np.concatenate((cA.flatten(), cH.flatten(), cV.flatten(), cD.flatten()))
+combine_end_time = time.time()
+combined_coeffs_memory_usage = sys.getsizeof(combined_coeffs)
+total_memory_usage += combined_coeffs_memory_usage
+print(f"Combining Coefficients Time: {combine_end_time - combine_start_time:.4f} seconds")
+print(f"Memory Usage of Combined Coefficients: {combined_coeffs_memory_usage} bytes")
+
+# Apply Huffman coding
+huffman_start_time = time.time()
+huffman_code = huffman_coding(combined_coeffs)
+encoded_data = ''.join(huffman_code[value] for value in combined_coeffs)
+huffman_end_time = time.time()
+huffman_code_memory_usage = sys.getsizeof(huffman_code)
+encoded_data_memory_usage = sys.getsizeof(encoded_data)
+total_memory_usage += huffman_code_memory_usage + encoded_data_memory_usage
+print(f"Huffman Coding Time: {huffman_end_time - huffman_start_time:.4f} seconds")
+print(f"Memory Usage of Huffman Codes: {huffman_code_memory_usage} bytes")
+print(f"Memory Usage of Encoded Data: {encoded_data_memory_usage} bytes")
+
+# Decode the data
+decoding_start_time = time.time()
+def huffman_decoding(encoded_data, huffman_code):
+    reverse_huffman_code = {v: k for k, v in huffman_code.items()}
+    current_code = ""
+    decoded_data = []
+
+    for bit in encoded_data:
+        current_code += bit
+        if current_code in reverse_huffman_code:
+            decoded_data.append(reverse_huffman_code[current_code])
+            current_code = ""
+
+    return decoded_data
+
+decoded_data = huffman_decoding(encoded_data, huffman_code)
+decoding_end_time = time.time()
+decoded_data_memory_usage = sys.getsizeof(decoded_data)
+total_memory_usage += decoded_data_memory_usage
+print(f"Decoding Time: {decoding_end_time - decoding_start_time:.4f} seconds")
+print(f"Memory Usage of Decoded Data: {decoded_data_memory_usage} bytes")
+
+# Reshape the decoded data back to the original combined coefficients shape
+reshape_start_time = time.time()
+decoded_coeffs = np.array(decoded_data).reshape(combined_coeffs.shape)
+cA_decoded = decoded_coeffs[:cA.size].reshape(cA.shape)
+cH_decoded = decoded_coeffs[cA.size:cA.size + cH.size].reshape(cH.shape)
+cV_decoded = decoded_coeffs[cA.size + cH.size:cA.size + cH.size + cV.size].reshape(cV.shape)
+cD_decoded = decoded_coeffs[cA.size + cH.size + cV.size:].reshape(cD.shape)
+reshape_end_time = time.time()
+decoded_coeffs_memory_usage = sys.getsizeof(decoded_coeffs)
+total_memory_usage += decoded_coeffs_memory_usage
+print(f"Reshaping Time: {reshape_end_time - reshape_start_time:.4f} seconds")
+print(f"Memory Usage after Reshaping: {decoded_coeffs_memory_usage} bytes")
+
+# Reconstruct the image from the DWT coefficients
+reconstruction_start_time = time.time()
+reconstructed_image = pywt.idwt2((cA_decoded, (cH_decoded, cV_decoded, cD_decoded)), 'haar')
+reconstruction_end_time = time.time()
+reconstructed_image_memory_usage = sys.getsizeof(reconstructed_image)
+total_memory_usage += reconstructed_image_memory_usage
+print(f"Image Reconstruction Time: {reconstruction_end_time - reconstruction_start_time:.4f} seconds")
+print(f"Memory Usage of Reconstructed Image: {reconstructed_image_memory_usage} bytes")
+
+# Convert the image to uint8
+conversion_start_time = time.time()
+reconstructed_image_uint8 = np.uint8(reconstructed_image)
+conversion_end_time = time.time()
+reconstructed_image_uint8_memory_usage = sys.getsizeof(reconstructed_image_uint8)
+total_memory_usage += reconstructed_image_uint8_memory_usage
+print(f"Conversion Time: {conversion_end_time - conversion_start_time:.4f} seconds")
+print(f"Memory Usage after Conversion: {reconstructed_image_uint8_memory_usage} bytes")
+
+# Save the reconstructed image as a JPEG file
+save_start_time = time.time()
+output_path = 'compressed_image.jpg'
+cv2.imwrite(output_path, reconstructed_image_uint8)
+save_end_time = time.time()
+print(f"Image Saving Time: {save_end_time - save_start_time:.4f} seconds")
+
+# Get the size of the JPEG file in kilobytes
+file_size_kb = os.path.getsize(output_path) / 1024
+print("Compressed Image Size (in KB):", file_size_kb)
+
+# Print total time and total memory usage
+end_time = time.time()
+print(f"Total Execution Time: {end_time - start_time:.4f} seconds")
+print(f"Total Memory Usage: {total_memory_usage} bytes")

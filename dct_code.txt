@@ -1,0 +1,65 @@
+import numpy as np
+import cv2
+from scipy.fftpack import dct
+import matplotlib.pyplot as plt
+import os
+
+def load_image(file_path):
+    # Load image using OpenCV
+    im = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    return im
+
+def apply_dct(image):
+    # Apply DCT on the image
+    dct_im = dct(dct(image.T, norm='ortho').T, norm='ortho')
+    return dct_im
+
+def save_image(im, file_path):
+    # Save the image in JPEG format
+    cv2.imwrite(file_path, im)
+
+def display_image(im, title='Image'):
+    # Display the image
+    plt.imshow(im, cmap='gray')
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
+
+def get_file_size(file_path):
+    # Get the file size in kilobytes
+    size_bytes = os.path.getsize(file_path)
+    size_kb = size_bytes / 1024  # Convert bytes to KB
+    return size_kb
+
+if __name__ == "__main__":
+    # Specify the image file path
+    file_path = r"D:\ENAM\PAPERS\papers\AR VR Paper\circuit_boards3.jpeg"
+
+    # Load image
+    im = load_image(file_path)
+
+    # Get and print the size of the original image in KB
+    original_image_size_kb = get_file_size(file_path)
+    print(f'Size of the original image: {original_image_size_kb:.2f} KB')
+
+    # Display original image
+    display_image(im, title='Original Image')
+
+    # Apply DCT
+    dct_image = apply_dct(im)
+
+    # Normalize DCT image for display (since DCT can have a wide range of values)
+    dct_image_normalized = cv2.normalize(dct_im, None, 0, 255, cv2.NORM_MINMAX)
+    dct_image_normalized = np.uint8(dct_image_normalized)
+
+    # Display DCT image
+    display_image(dct_image_normalized, title='DCT Image')
+
+    # Save the DCT image as JPEG
+    save_path = file_path.rsplit('.', 1)[0] + '_dct.jpg'
+    save_image(dct_image_normalized, save_path)
+    print(f'DCT image saved as: {save_path}')
+
+    # Get and print the size of the DCT JPEG image in KB
+    image_size_kb = get_file_size(save_path)
+    print(f'Size of the DCT JPEG image: {image_size_kb:.2f} KB')

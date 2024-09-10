@@ -1,0 +1,96 @@
+import os
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+from scipy.fftpack import dct
+import time
+
+def performance_evaluation_algorithm(image_path, n):
+    # Start timing
+    start_time = time.time()
+
+    # Step 1: Data Generation
+    img = Image.open(image_path)
+    W, H = img.size
+
+    # Step 2: Compressing image (Convert to grayscale)
+    img_gray = img.convert('L')
+
+    # Step 3: Convert data into residue values
+    m1 = 2**n + (2 ** (n - 1)) - 1
+    m2 = 2 ** (n + 1)
+    m3 = 2 ** (n + 1) - 1
+
+    img_array = np.array(img_gray)
+    x1 = np.mod(img_array, m1)
+    x2 = np.mod(img_array, m2)
+    x3 = np.mod(img_array, m3)
+
+    # Combine residue images into one image by stacking along a new axis and then concatenating
+    residue_image = np.concatenate((x1, x2, x3), axis=1)
+
+    # Save the residue image directly as a JPEG file
+    residue_img_path = 'residual1.jpg'
+    residue_img = Image.fromarray(residue_image.astype('uint8'))
+    residue_img.convert('RGB').save(residue_img_path, 'JPEG')
+
+    # Apply DCT to the residual image
+    residue_array = np.array(residue_img.convert('L'))
+    dct_transformed = dct(dct(residue_array.T, norm='ortho').T, norm='ortho')
+
+    # Convert the DCT transformed image to uint8 for saving
+    dct_transformed_img = Image.fromarray(np.uint8(np.abs(dct_transformed)))
+
+    # Save the DCT transformed image as JPEG
+    dct_img_path = 'dct_residual1.jpg'
+    dct_transformed_img.convert('RGB').save(dct_img_path, 'JPEG')
+
+    # Calculate the file size in bytes
+    original_file_size_bytes = os.path.getsize(image_path)
+    dct_file_size_bytes = os.path.getsize(dct_img_path)
+
+    # Convert sizes to kilobytes
+    original_file_size_kb = original_file_size_bytes / 1024
+    dct_file_size_kb = dct_file_size_bytes / 1024
+
+    # Display comparison of images
+    plt.figure(figsize=(12, 12))
+
+    plt.subplot(2, 2, 1)
+    plt.title("Original Image")
+    plt.imshow(img, cmap='gray')
+
+    plt.subplot(2, 2, 2)
+    plt.title("Histogram of Original Image")
+    plt.hist(np.array(img_gray).flatten(), bins=256, range=(0, 256))
+
+    plt.subplot(2, 2, 3)
+    plt.title("DCT Residual Image")
+    plt.imshow(dct_transformed_img, cmap='gray')
+
+    plt.subplot(2, 2, 4)
+    plt.title("Histogram of DCT Residual Image")
+    plt.hist(np.array(dct_transformed_img).flatten(), bins=256, range=(0, 256))
+
+    plt.show()
+
+    print(f"Original image file size: {original_file_size_kb:.2f} KB")
+    print(f"DCT Residual image file size: {dct_file_size_kb:.2f} KB")
+
+    # Calculate and display the estimated total memory usage in bytes
+    total_memory_usage_bytes = W * H * 19
+    total_memory_usage_kb = total_memory_usage_bytes / 1024
+    print(f"Estimated Total Memory Usage: {total_memory_usage_bytes:.2f} bytes")
+    print(f"Estimated Total Memory Usage: {total_memory_usage_kb:.2f} KB")
+
+    # End timing
+    end_time = time.time()
+    runtime = end_time - start_time
+    print(f"Algorithm runtime: {runtime:.2f} seconds")
+
+    return original_file_size_kb, dct_file_size_kb
+
+# Example usage:
+image_path = r"D:\ENAM\PAPERS\AR VR Paper\imageARVR\circuit_boards1.jpeg"  # Use raw string for file path
+n = 2
+original_size_kb, dct_size_kb = performance_evaluation_algorithm(image_path, n)
